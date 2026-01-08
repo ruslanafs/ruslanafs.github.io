@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <style>
+    #map {
+      width: 600px;
+      height: 600px;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="map"></div>
+  <script>
+
+    var buffalocitycenter = [42.88639, -78.87806];
+    var jamestowncityhall = [42.096603,-79.237924]
+    var map = L.map('map').setView(buffalocitycenter, 8);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+    }).addTo(map);
+
+    fetch("./assets/ne_10m_admin_2_counties.json")
+      .then(response => {
+        if (!response.ok) {
+          throw new Error("GeoJSON failed to load");
+        }
+        return response.json();
+      })
+      .then(geojsonData => {
+        var filteredGeojson = {
+          ...geojsonData,
+          features: geojsonData.features.filter(
+            f => (f.properties.REGION === "PA" &&
+              (f.properties.NAME === "Warren" ||
+                f.properties.NAME === "Potter" || 
+                f.properties.NAME === "McKean"
+              ) || (f.properties.REGION === "NY" && (f.properties.NAME === "Erie" || f.properties.NAME === "Niagara" || f.properties.NAME === "Chautauqua" || f.properties.NAME === "Cattaraugus" || f.properties.NAME === "Allegany" || f.properties.NAME === "Wyoming" || f.properties.NAME === "Genesee"))))
+        };
+        L.geoJSON(filteredGeojson, {
+          onEachFeature: (feature, layer) => {
+            layer.bindTooltip(feature.properties["NAME"], {
+              permanent: true,
+              direction: "center",
+              className: "countyTooltip",
+            })
+          }
+        }).addTo(map);
+      })
+      .catch(error => {
+        console.error("Error loading GeoJSON:", error);
+      });
+
+      buffalozones = [21500, 31500, 39500, 53000] // estimations based on map photographs
+      jamestownzones = [16090, 32190] // 10 & 20 mi
+
+      buffalozones.forEach((element, index) => {
+        L.circle(buffalocitycenter, {
+          radius: element,
+        }).addTo(map);
+      });
+
+      jamestownzones.forEach(element => {
+        L.circle(jamestowncityhall, {
+          radius: element
+        }).bindTooltip("goose", {
+          permanent: true,
+          direction: "center",
+          className: "zoneTooltip"
+        }).addTo(map);
+      });
+      
+
+  </script>
+</body>
+
+</html>
