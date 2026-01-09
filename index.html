@@ -9,6 +9,7 @@
     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@7/turf.min.js"></script>
   <style>
     #map {
       width: 600px;
@@ -18,69 +19,185 @@
 </head>
 
 <body>
+    <label for="query">Address:</label>
+    <input type="text" id="query" name="query">
+    <button onclick="searchAddress();">Search</button>
   <div id="map"></div>
   <script>
+    
+    const buffaloLatLng = [42.88639, -78.87806];
+    const jamestownLatLng = [42.096603, -79.237924];
 
-    var buffalocitycenter = [42.88639, -78.87806];
-    var jamestowncityhall = [42.096603,-79.237924]
-    var map = L.map('map').setView(buffalocitycenter, 8);
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    const buffaloPoint = turf.point([-78.87806, 42.88639]);
+    const jamestownPoint = turf.point([-79.237924, 42.096603]);
+
+    const buffaloZones = [21500, 31500, 39500, 53000];
+    const jamestownZones = [16090, 32190];
+
+    const map = L.map("map").setView(buffaloLatLng, 8);
+
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
-      attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+      attribution: "&copy; OpenStreetMap",
     }).addTo(map);
 
+    
+
     fetch("./assets/ne_10m_admin_2_counties.json")
-      .then(response => {
-        if (!response.ok) {
-          throw new Error("GeoJSON failed to load");
-        }
-        return response.json();
-      })
-      .then(geojsonData => {
-        var filteredGeojson = {
-          ...geojsonData,
-          features: geojsonData.features.filter(
-            f => (f.properties.REGION === "PA" &&
-              (f.properties.NAME === "Warren" ||
-                f.properties.NAME === "Potter" || 
-                f.properties.NAME === "McKean"
-              ) || (f.properties.REGION === "NY" && (f.properties.NAME === "Erie" || f.properties.NAME === "Niagara" || f.properties.NAME === "Chautauqua" || f.properties.NAME === "Cattaraugus" || f.properties.NAME === "Allegany" || f.properties.NAME === "Wyoming" || f.properties.NAME === "Genesee"))))
+      .then(r => r.json())
+      .then(data => {
+
+        counties = {
+          type: "FeatureCollection",
+          features: data.features.filter(f =>
+            (f.properties.REGION === "PA" && ["Warren", "Potter", "McKean"].includes(f.properties.NAME))
+            ||
+            (f.properties.REGION === "NY" && ["Erie", "Niagara", "Chautauqua", "Cattaraugus", "Allegany", "Wyoming"].includes(f.properties.NAME))
+          )
         };
-        L.geoJSON(filteredGeojson, {
+
+        // Draw counties
+        L.geoJSON(counties, {
+          style: { color: "#444", weight: 1, fillOpacity: 0.1 },
+          attribution:"Made with Natural Earth",
           onEachFeature: (feature, layer) => {
-            layer.bindTooltip(feature.properties["NAME"], {
+            layer.bindTooltip(feature.properties.NAME, {
               permanent: true,
               direction: "center",
               className: "countyTooltip",
-            })
+              opacity: 0.5
+            });
           }
         }).addTo(map);
+
+        // rochester counties
+        adjcounties = {
+          type: "FeatureCollection",
+          features: data.features.filter(f =>
+            (f.properties.REGION === "PA" && ["Tioga", "Lycoming", "Clinton", "Cameron", "Elk", "Forest", "Venango", "Crawford", "Erie"].includes(f.properties.NAME))
+            ||
+            (f.properties.REGION === "NY" && ["Orleans", "Livingston", "Steuben"].includes(f.properties.NAME))
+          )
+        };
+
+        L.geoJSON(adjcounties, {
+          style: { color: "#444", weight: 1, fillOpacity: 1 },
+        }).addTo(map);
+
+
+      });
+
+    // Load Genesee County townships
+    fetch("./assets/Towns.json")
+      .then(r => r.json())
+      .then(data => {
+        const buffaloTowns = {
+          type: "FeatureCollection",
+          features: data.features.filter(f =>
+            f.properties.COUNTY === "Genesee" &&
+            ["Alabama", "Alexander", "Darien", "Oakfield", "Pembroke"].includes(f.properties.NAME)
+          )
+        };
+
+        // Draw them on the map
+        L.geoJSON(buffaloTowns, {
+          style: {
+            fillColor: "#444",   // orange fill
+            fillOpacity: 0.1,
+            weight: 1,
+            color: "#444",
+            attribution: "NYS GIS Clearinghouse"
+          },
+          onEachFeature: (feature, layer) => {
+            if(feature.properties.NAME === "Pembroke") {
+              layer.bindTooltip("Genesee", {
+              permanent: true,
+              direction: "center",
+              className: "countyTooltip",
+              opacity: 0.5
+            });
+            }
+          }
+        }).addTo(map);
+
+        const rochesterTowns = {type: "FeatureCollection",
+          features: data.features.filter(f =>
+            f.properties.COUNTY === "Genesee" &&
+            ["Batavia", "Bergen", "Bethany", "Byron", "Elba", "LeRoy", "Pavilion", "Stafford"].includes(f.properties.NAME)
+          )};
+
+          L.geoJSON(rochesterTowns, {
+          style: {
+            color: "#444",
+            // color: "#444",
+            fillOpacity: 1,
+            weight: 2
+          },
+        }).addTo(map);
+
+        // fucking batavia man
+        L.circle([42.998116, -78.187515], {
+          radius: 4000,
+
+            color: "#444",
+            fillColor:"#444",
+            fillOpacity: 1,
+            weight: 1
+          
+        }).addTo(map);
+
       })
-      .catch(error => {
-        console.error("Error loading GeoJSON:", error);
-      });
+      .catch(err => console.error("Error loading Genesee townships:", err));
 
-      buffalozones = [21500, 31500, 39500, 53000] // estimations based on map photographs
-      jamestownzones = [16090, 32190] // 10 & 20 mi
+    const latOffset = 0.05
+      buffaloZones.forEach((meters, index) => {
+  const buffer = turf.buffer(buffaloPoint, meters / 1000, { units: "kilometers" });
+  L.geoJSON(buffer, { style: { color: "#bf2424", weight: 1, fillOpacity: 0.2 } }).addTo(map);
 
-      buffalozones.forEach((element, index) => {
-        L.circle(buffalocitycenter, {
-          radius: element,
-        }).addTo(map);
-      });
+  // get the southernmost point for labeling
+  const coords = buffer.geometry.coordinates[0]; // outer ring
+  const bottomPoint = coords.reduce((minPt, pt) => pt[1] < minPt[1] ? pt : minPt, coords[0]);
+  
+  L.marker([bottomPoint[1] + latOffset, bottomPoint[0]], {
+    icon: L.divIcon({
+      className: "zoneLabel",
+      html: "Zone " + (index + 1),
+      iconSize: [40, 12]
+    })
+  }).addTo(map);
+});
 
-      jamestownzones.forEach(element => {
-        L.circle(jamestowncityhall, {
-          radius: element
-        }).bindTooltip("goose", {
-          permanent: true,
-          direction: "center",
-          className: "zoneTooltip"
-        }).addTo(map);
-      });
+jamestownZones.forEach((meters, index) => {
+  const buffer = turf.buffer(jamestownPoint, meters / 1000, { units: "kilometers" });
+  L.geoJSON(buffer, { style: { color: "#00aa66", weight: 1, fillOpacity: 0.15 } }).addTo(map);
+
+  // get the southernmost point for labeling
+  const coords = buffer.geometry.coordinates[0]; // outer ring
+  const bottomPoint = coords.reduce((minPt, pt) => pt[1] < minPt[1] ? pt : minPt, coords[0]);
+  
+  L.marker([bottomPoint[1]+ latOffset, bottomPoint[0]], {
+    icon: L.divIcon({
+      className: "zoneLabel",
+      html: "Zone " + (index + 1) + "-J",
+      iconSize: [50, 12]
+    })
+  }).addTo(map);
+});
+
+    function searchAddress() {
       
+fetch("https://nominatim.openstreetmap.org/search?q=" +document.getElementById("query").value+"&format=json&polygon=1&addressdetails=1")
+      .then(r => r.json())
+      .then(data => {
+        L.marker([data[0].lat,data[0].lon], {color: "#bf2424"}).addTo(map);
+     })
+    return false;}
+    
+
 
   </script>
+
+  
 </body>
 
 </html>
